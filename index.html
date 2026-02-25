@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vCard Converter Tool</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 200px;
+            font-family: Arial, sans-serif;
+        }
+        
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .instructions {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>vCard Converter Tool</h1>
+        
+        <div class="instructions">
+            <h3>使用说明：</h3>
+            <ul>
+                <li>输入姓名和手机号码，每行一个联系人</li>
+                <li>格式：姓名 手机号码（用空格分隔）</li>
+                <li>支持批量输入多个联系人</li>
+                <li>点击"转换并下载"按钮生成vCard文件</li>
+            </ul>
+            <p><strong>示例：</strong></p>
+            <p>张三 13800138000</p>
+            <p>李四 13900139000</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="contact-input">输入联系人信息：</label>
+            <textarea id="contact-input" placeholder="请输入姓名和手机号码，每行一个联系人..."></textarea>
+        </div>
+        
+        <div id="error-message" class="error"></div>
+        
+        <button id="convert-btn">转换并下载</button>
+    </div>
+    
+    <div class="container" style="margin-top: 30px;">
+        <h2>vCard 转 CSV</h2>
+        
+        <div class="instructions">
+            <h3>使用说明：</h3>
+            <ul>
+                <li>上传 vCard 文件（.vcf 格式）</li>
+                <li>点击"转换为CSV"按钮</li>
+                <li>下载生成的 CSV 文件</li>
+            </ul>
+        </div>
+        
+        <div class="form-group">
+            <label for="vcard-upload">上传 vCard 文件：</label>
+            <input type="file" id="vcard-upload" accept=".vcf">
+        </div>
+        
+        <div id="vcard-error" class="error"></div>
+        
+        <button id="convert-to-csv-btn">转换为CSV</button>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const convertBtn = document.getElementById('convert-btn');
+            const contactInput = document.getElementById('contact-input');
+            const errorMessage = document.getElementById('error-message');
+            
+            convertBtn.addEventListener('click', function() {
+                const input = contactInput.value.trim();
+                errorMessage.textContent = '';
+                
+                if (!input) {
+                    errorMessage.textContent = '请输入联系人信息';
+                    return;
+                }
+                
+                const contacts = parseInput(input);
+                if (contacts.length === 0) {
+                    errorMessage.textContent = '请输入有效的联系人信息';
+                    return;
+                }
+                
+                const vCardContent = generateVCard(contacts);
+                downloadVCard(vCardContent);
+            });
+            
+            function parseInput(input) {
+                const lines = input.split('\n');
+                const contacts = [];
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine) {
+                        const parts = trimmedLine.split(/\s+/);
+                        if (parts.length >= 2) {
+                            const name = parts.slice(0, -1).join(' ');
+                            const phone = parts[parts.length - 1];
+                            
+                            if (validatePhone(phone)) {
+                                contacts.push({ name, phone });
+                            } else {
+                                errorMessage.textContent = `无效的电话号码: ${phone}`;
+                                return [];
+                            }
+                        }
+                    }
+                }
+                
+                return contacts;
+            }
+            
+            function validatePhone(phone) {
+                // 支持多种电话号码格式
+                const phoneRegex = /^[+]?[0-9\s-()]{7,15}$/;
+                return phoneRegex.test(phone);
+            }
+            
+            function generateVCard(contacts) {
+                let vCardContent = '';
+                
+                for (const contact of contacts) {
+                    vCardContent += 'BEGIN:VCARD\n';
+                    vCardContent += 'VERSION:3.0\n';
+                    vCardContent += `FN:${contact.name}\n`;
+                    vCardContent += `TEL:${contact.phone}\n`;
+                    vCardContent += 'END:VCARD\n\n';
+                }
+                
+                return vCardContent;
+            }
+            
+            function downloadVCard(content) {
+                const blob = new Blob([content], { type: 'text/vcard' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'contacts.vcf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            // vCard to CSV functionality
+            const vcardUpload = document.getElementById('vcard-upload');
+            const convertToCsvBtn = document.getElementById('convert-to-csv-btn');
+            const vcardError = document.getElementById('vcard-error');
+            
+            convertToCsvBtn.addEventListener('click', function() {
+                const file = vcardUpload.files[0];
+                vcardError.textContent = '';
+                
+                if (!file) {
+                    vcardError.textContent = '请选择一个vCard文件';
+                    return;
+                }
+                
+                if (!file.name.endsWith('.vcf')) {
+                    vcardError.textContent = '请上传.vcf格式的文件';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const vcardContent = e.target.result;
+                    const contacts = parseVCard(vcardContent);
+                    
+                    if (contacts.length === 0) {
+                        vcardError.textContent = '无法解析vCard文件';
+                        return;
+                    }
+                    
+                    const csvContent = generateCSV(contacts);
+                    downloadCSV(csvContent);
+                };
+                reader.readAsText(file);
+            });
+            
+            function parseVCard(vcardContent) {
+                const contacts = [];
+                const vcards = vcardContent.split('END:VCARD');
+                
+                for (const vcard of vcards) {
+                    if (vcard.trim()) {
+                        const contact = {};
+                        let currentLine = '';
+                        
+                        // 处理折叠行并解析字段
+                        const lines = vcard.split('\n');
+                        for (const line of lines) {
+                            const trimmedLine = line.trim();
+                            if (trimmedLine) {
+                                if (line.startsWith(' ') || line.startsWith('\t')) {
+                                    // 折叠行，追加到当前行
+                                    currentLine += trimmedLine;
+                                } else {
+                                    // 新字段，处理之前的字段
+                                    if (currentLine) {
+                                        parseVCardField(currentLine, contact);
+                                    }
+                                    currentLine = trimmedLine;
+                                }
+                            }
+                        }
+                        
+                        // 处理最后一个字段
+                        if (currentLine) {
+                            parseVCardField(currentLine, contact);
+                        }
+                        
+                        // 确保至少有姓名或电话
+                        if (contact.name || contact.phone) {
+                            contacts.push(contact);
+                        }
+                    }
+                }
+                
+                return contacts;
+            }
+            
+            function parseVCardField(field, contact) {
+                const colonIndex = field.indexOf(':');
+                if (colonIndex > 0) {
+                    const keyPart = field.substring(0, colonIndex);
+                    const value = field.substring(colonIndex + 1);
+                    
+                    // 提取字段名（去除类型参数）
+                    const key = keyPart.split(';')[0].toUpperCase();
+                    
+                    if (key === 'FN') {
+                        contact.name = value;
+                    } else if (key === 'N') {
+                        // 处理结构化名称 N:姓;名;;; 
+                        if (!contact.name) {
+                            const parts = value.split(';');
+                            let nameParts = [];
+                            if (parts[1] && parts[1].trim()) nameParts.push(parts[1].trim());
+                            if (parts[0] && parts[0].trim()) nameParts.push(parts[0].trim());
+                            if (nameParts.length > 0) {
+                                contact.name = nameParts.join(' ');
+                            }
+                        }
+                    } else if (key === 'TEL') {
+                        contact.phone = value;
+                    }
+                }
+            }
+            
+            function generateCSV(contacts) {
+                let csvContent = 'Name,Phone\n';
+                
+                for (const contact of contacts) {
+                    const name = (contact.name || '').replace(/"/g, '""');
+                    const phone = (contact.phone || '').replace(/"/g, '""');
+                    csvContent += `"${name}","${phone}"\n`;
+                }
+                
+                return csvContent;
+            }
+            
+            function downloadCSV(content) {
+                const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'contacts.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+    </script>
+</body>
+</html>
